@@ -12,10 +12,12 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.context.annotation.Profile;
 
 @Configuration
 @EnableScheduling
 @Slf4j
+@Profile("!test")
 public class Auth0Config {
 
     @Value("${auth0.domain}")
