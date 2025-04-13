@@ -9,19 +9,22 @@ import com.auth0.json.mgmt.users.User;
 import com.auth0.json.mgmt.users.UsersPage;
 import fer.solar.usermanagement.config.Auth0Config;
 import fer.solar.usermanagement.user.dto.CreateUserRequest;
+import fer.solar.usermanagement.user.dto.CreateUserResponse;
 import fer.solar.usermanagement.user.dto.PaginatedUserResponse;
+import fer.solar.usermanagement.user.dto.RoleInfo;
+import fer.solar.usermanagement.user.dto.UpdateUserRequest;
 import fer.solar.usermanagement.user.dto.UserResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import fer.solar.usermanagement.common.util.SortingUtils;
 
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.security.SecureRandom;
-import java.util.Base64;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -29,19 +32,18 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Profile("!test")
 public class Auth0UserService implements UserService {
 
     private final Auth0Config auth0Config;
 
     @Override
-    public Mono<String> createUser(CreateUserRequest request) {
+    public Mono<CreateUserResponse> createUser(CreateUserRequest request) {
         return Mono.fromCallable(() -> {
             User createdUser = null;
             try {
                 createdUser = createAuth0User(request);
                 assignRolesToUser(createdUser, request.getRoleIds());
-                return generatePasswordChangeTicket(createdUser, request.getResultUrl());
+                return new CreateUserResponse(generatePasswordChangeTicket(createdUser, request.getResultUrl()));
             } catch (Auth0Exception e) {
                 log.error("Error during user creation flow for email {}: {}", request.getEmail(), e.getMessage(), e);
                 if (createdUser != null) {
@@ -60,11 +62,11 @@ public class Auth0UserService implements UserService {
 
         char[] temporaryPassword = generateRandomPasswordChars(16);
         newUser.setPassword(temporaryPassword);
-        // Ensure password is cleared from memory immediately after use for security
-        java.util.Arrays.fill(temporaryPassword, '\0');
 
         try {
             User createdUser = mgmt.users().create(newUser).execute().getBody();
+            // Ensure password is cleared from memory immediately after use for security
+            java.util.Arrays.fill(temporaryPassword, '\0');
             log.info("Auth0 user created successfully with ID: {}", createdUser.getId());
             return createdUser;
         } catch (Auth0Exception e) {
@@ -118,18 +120,37 @@ public class Auth0UserService implements UserService {
             mgmt.users().delete(userId).execute();
             log.info("Rollback successful: Deleted user with ID {}", userId);
         } catch (Auth0Exception rollbackEx) {
-            // Log the rollback failure, but don't throw, as the original error is more important
             log.error("Rollback failed: Could not delete user with ID {} during cleanup: {}", userId, rollbackEx.getMessage(), rollbackEx);
         }
     }
 
     private char[] generateRandomPasswordChars(int length) {
+        final String lower = "abcdefghijklmnopqrstuvwxyz";
+        final String upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        final String digits = "0123456789";
+        final String special = "!@#$%^&*";
+        final String allChars = lower + upper + digits + special;
+
         SecureRandom random = new SecureRandom();
-        byte[] bytes = new byte[length * 3 / 4 + 1]; // Ensure enough bytes for encoding
-        random.nextBytes(bytes);
-        String passwordString = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes).substring(0, length);
-        char[] passwordChars = passwordString.toCharArray();
-        return passwordChars;
+        List<Character> passwordChars = new ArrayList<>(length);
+
+        passwordChars.add(lower.charAt(random.nextInt(lower.length())));
+        passwordChars.add(upper.charAt(random.nextInt(upper.length())));
+        passwordChars.add(digits.charAt(random.nextInt(digits.length())));
+        passwordChars.add(special.charAt(random.nextInt(special.length())));
+
+        for (int i = 4; i < length; i++) {
+             passwordChars.add(allChars.charAt(random.nextInt(allChars.length())));
+        }
+
+        Collections.shuffle(passwordChars, random);
+
+        char[] password = new char[length];
+        for (int i = 0; i < length; i++) {
+            password[i] = passwordChars.get(i);
+        }
+
+        return password;
     }
 
     @Override
@@ -159,6 +180,8 @@ public class Auth0UserService implements UserService {
                 .flatMap(this::mapUserToResponse);
 
         return userResponseFlux.collectList().map(userResponses -> {
+            userResponses.sort(SortingUtils.createNullsFirstCaseInsensitiveComparator(UserResponse::getName));
+
             long totalElements = usersPage.getTotal();
             int totalPages = (size > 0) ? (int) Math.ceil((double) totalElements / size) : 0;
 
@@ -176,7 +199,9 @@ public class Auth0UserService implements UserService {
         return Mono.fromCallable(() -> {
                     ManagementAPI mgmt = auth0Config.getRefreshedManagementAPI();
                     List<Role> roles = mgmt.users().listRoles(user.getId(), null).execute().getBody().getItems();
-                    List<String> roleNames = roles.stream().map(Role::getName).collect(Collectors.toList());
+                    List<RoleInfo> roleInfos = roles.stream()
+                            .map(role -> new RoleInfo(role.getId(), role.getName()))
+                            .collect(Collectors.toList());
 
                     return UserResponse.builder()
                             .userId(user.getId())
@@ -184,7 +209,7 @@ public class Auth0UserService implements UserService {
                             .name(user.getName())
                             .picture(user.getPicture())
                             .lastLogin(user.getLastLogin() != null ? user.getLastLogin().toString() : null)
-                            .roles(roleNames)
+                            .roles(roleInfos)
                             .build();
                 })
                 .subscribeOn(Schedulers.boundedElastic())
@@ -225,5 +250,65 @@ public class Auth0UserService implements UserService {
         }).subscribeOn(Schedulers.boundedElastic()).then();
     }
 
-    // ... (Update user stub needs updated UpdateUserRequest import if uncommented) ...
+    @Override
+    public Mono<Void> updateUser(String userId, UpdateUserRequest request) {
+        return Mono.fromRunnable(() -> {
+            ManagementAPI mgmt = null;
+            List<String> successfullyRemovedRoles = new ArrayList<>();
+            List<String> rolesToRemove = Collections.emptyList();
+            List<String> rolesToAdd = Collections.emptyList();
+
+            try {
+                mgmt = auth0Config.getRefreshedManagementAPI();
+                List<String> requestedRoleIds = request.getRoleIds() == null ? Collections.emptyList() : request.getRoleIds();
+
+                List<Role> currentRoles = mgmt.users().listRoles(userId, null).execute().getBody().getItems();
+                List<String> currentRoleIds = currentRoles.stream().map(Role::getId).collect(Collectors.toList());
+
+                rolesToAdd = requestedRoleIds.stream()
+                        .filter(roleId -> !currentRoleIds.contains(roleId))
+                        .collect(Collectors.toList());
+
+                rolesToRemove = currentRoleIds.stream()
+                        .filter(roleId -> !requestedRoleIds.contains(roleId))
+                        .collect(Collectors.toList());
+
+                if (!rolesToRemove.isEmpty()) {
+                    mgmt.users().removeRoles(userId, rolesToRemove).execute();
+                    successfullyRemovedRoles.addAll(rolesToRemove);
+                }
+
+                if (!rolesToAdd.isEmpty()) {
+                    mgmt.users().addRoles(userId, rolesToAdd).execute();
+                }
+            } catch (Auth0Exception addEx) {
+                log.error("Error adding roles {} to Auth0 user {}: {}. Initiating rollback.", rolesToAdd, userId, addEx.getMessage(), addEx);
+                if (!successfullyRemovedRoles.isEmpty()) {
+                    attemptRoleAdditionRollback(mgmt, userId, successfullyRemovedRoles);
+                }
+                throw new RuntimeException("Failed to add roles for user in Auth0, rollback attempted.", addEx);
+
+            } catch (Exception e) {
+                log.error("An unexpected error occurred during role update for user {}: {}", userId, e.getMessage(), e);
+                throw new RuntimeException("Failed to update roles for user: " + e.getMessage(), e);
+            }
+        })
+        .subscribeOn(Schedulers.boundedElastic())
+        .then();
+    }
+
+    private void attemptRoleAdditionRollback(ManagementAPI mgmt, String userId, List<String> rolesToReAdd) {
+        if (mgmt == null) {
+            log.error("Rollback impossible: ManagementAPI client was not initialized before failure.");
+            return;
+        }
+        log.warn("Rollback: Attempting to re-add previously removed roles {} for user {}", rolesToReAdd, userId);
+        try {
+            mgmt.users().addRoles(userId, rolesToReAdd).execute();
+        } catch (Auth0Exception rollbackEx) {
+            log.error("Rollback attempt failed for user {}: {}", userId, rollbackEx.getMessage(), rollbackEx);
+        }
+        log.info("Rollback successful: Re-added roles {} for user {}", rolesToReAdd, userId);
+    }
+
 } 
