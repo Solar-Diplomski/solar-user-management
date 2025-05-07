@@ -16,18 +16,13 @@ public class PermissionController {
 
     @GetMapping
     public Mono<PaginatedPermissionResponse> listPermissions() {
-        // Currently fetches all permissions, pagination is handled in the response DTO structure
         return permissionService.listPermissions();
     }
 
     @PutMapping
-    @ResponseStatus(HttpStatus.NO_CONTENT) // Or OK if returning the updated list
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     public Mono<Void> updatePermissions(@RequestBody UpdatePermissionsRequest request) {
         return permissionService.updatePermissions(request);
     }
-
-    // Note: Creating/Deleting individual permissions (scopes) is done via the PUT endpoint
-    // by providing the complete desired list of scopes for the resource server.
-    // Auth0 doesn't typically have separate POST/DELETE endpoints for individual scopes
-    // within a resource server's definition via the Management API.
+    
 } 

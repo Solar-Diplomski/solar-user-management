@@ -11,5 +11,5 @@ public class RoleResponse {
     private String id;
     private String name;
     private String description;
-    private List<String> permissions; // List of permission names associated with the role
+    private List<String> permissions;
 } 

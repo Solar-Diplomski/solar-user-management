@@ -13,7 +13,7 @@ public class UpdatePermissionsRequest {
     @Data
     @NoArgsConstructor
     public static class PermissionUpdate {
-        private String permissionName; // The scope value, e.g., "read:users"
-        private String description;    // The scope description
+        private String permissionName;
+        private String description;
     }
 } 

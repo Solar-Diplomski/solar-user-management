@@ -6,6 +6,6 @@ import lombok.Data;
 @Data
 @Builder
 public class PermissionResponse {
-    private String permissionName; // e.g., "read:users"
-    private String description;    // Description from Auth0
+    private String permissionName;
+    private String description;
 } 

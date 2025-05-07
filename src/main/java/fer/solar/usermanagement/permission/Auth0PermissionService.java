@@ -39,13 +39,12 @@ public class Auth0PermissionService implements PermissionService {
             String apiIdentifier = auth0Config.getApiGatewayIdentifier();
             try {
                 ResourceServer server = mgmt.resourceServers().get(apiIdentifier).execute().getBody();
-                log.info("Fetched scopes for resource server: {}", apiIdentifier);
                 return server.getScopes() != null ? server.getScopes() : Collections.<Scope>emptyList();
             } catch (Auth0Exception e) {
                 log.error("Failed to fetch scopes for resource server {}: {}", apiIdentifier, e.getMessage());
                 throw new RuntimeException("Failed to fetch API scopes", e);
             }
-        }).onErrorReturn(Collections.emptyList()); // Return empty on error after logging
+        }).onErrorReturn(Collections.emptyList());
     }
 
     private PaginatedPermissionResponse buildPaginatedPermissionResponse(List<Scope> scopes) {
@@ -58,8 +57,8 @@ public class Auth0PermissionService implements PermissionService {
 
         permissionResponses.sort(SortingUtils.createNullsFirstCaseInsensitiveComparator(PermissionResponse::getPermissionName));
 
-        // Auth0 Resource Server scopes aren't typically paginated in the same way users/roles are.
-        // We fetch all scopes at once.
+        // We fetch all scopes at once since there is no pagination in Auth0
+        // In the future, we can add caching and pagination to this method
         int totalElements = permissionResponses.size();
         return PaginatedPermissionResponse.builder()
                 .content(permissionResponses)
@@ -76,16 +75,14 @@ public class Auth0PermissionService implements PermissionService {
             ManagementAPI mgmt = auth0Config.getRefreshedManagementAPI();
             String apiIdentifier = auth0Config.getApiGatewayIdentifier();
 
-            // Map DTO to Auth0 Scope objects, including description
             List<Scope> newScopes = request.getPermissions().stream()
-                .map(pUpdate -> {
-                    Scope scope = new Scope(pUpdate.getPermissionName());
-                    scope.setDescription(pUpdate.getDescription()); // Set the description
+                .map(permission -> {
+                    Scope scope = new Scope(permission.getPermissionName());
+                    scope.setDescription(permission.getDescription());
                     return scope;
                 })
                 .collect(Collectors.toList());
 
-            // Create ResourceServer object containing only the updated scopes
             ResourceServer serverUpdates = new ResourceServer();
             serverUpdates.setScopes(newScopes);
 

@@ -15,13 +15,6 @@ public interface UserService {
 
     Mono<UserResponse> getUserById(String userId);
 
-    /**
-     * Updates a user's roles in Auth0.
-     *
-     * @param userId The ID of the user to update.
-     * @param request The request containing the list of role IDs to assign.
-     * @return A Mono that completes when the roles are updated.
-     */
     Mono<Void> updateUser(String userId, UpdateUserRequest request);
 
     Mono<Void> deleteUser(String userId);

@@ -41,9 +41,7 @@ public class Auth0RoleService implements RoleService {
                     try {
                         Role createdRole = mgmt.roles().create(newRole).execute().getBody();
                         log.info("Created Auth0 role: {}", createdRole.getId());
-                        // Permissions must be added via the update endpoint.
-                        // Use getRoleById to ensure consistent response structure including permissions (empty initially)
-                        return getRoleById(createdRole.getId()).block(); // Blocking acceptable in fromCallable on boundedElastic
+                        return getRoleById(createdRole.getId()).block();
                     } catch (Auth0Exception e) {
                         log.error("Error creating Auth0 role with name {}: {}", request.getName(), e.getMessage(), e);
                         throw new RuntimeException("Failed to create role in Auth0", e);
@@ -74,8 +72,8 @@ public class Auth0RoleService implements RoleService {
 
     private Mono<PaginatedRoleResponse> buildPaginatedRoleResponse(RolesPage rolesPage) {
         Flux<RoleResponse> roleResponseFlux = Flux.fromIterable(rolesPage.getItems())
-                .flatMap(role -> fetchPermissionsForRole(role.getId())
-                        .flatMap(permissions -> mapRoleToResponse(role, permissions)));
+                                                  .flatMap(role -> fetchPermissionsForRole(role.getId())
+                                                  .flatMap(permissions -> mapRoleToResponse(role, permissions)));
 
         return roleResponseFlux.collectList().map(roleResponses -> {
             roleResponses.sort(SortingUtils.createNullsFirstCaseInsensitiveComparator(RoleResponse::getName));
@@ -189,7 +187,6 @@ public class Auth0RoleService implements RoleService {
                                     .filter(name -> !currentPermissionNames.contains(name))
                                     .collect(Collectors.toList());
 
-                            // Map names back to Permission objects using apiScopes
                             String apiIdentifier = auth0Config.getApiGatewayIdentifier();
                             List<Permission> permissionsToRemove = mapNamesToPermissions(namesToRemove, apiScopes, apiIdentifier);
                             List<Permission> permissionsToAdd = mapNamesToPermissions(namesToAdd, apiScopes, apiIdentifier);
@@ -208,7 +205,7 @@ public class Auth0RoleService implements RoleService {
                             return removeMono.then(addMono);
                         }))
                 .doOnError(e -> log.error("Failed to update permissions for role {}: {}", roleId, e.getMessage(), e))
-                .then(); // Ensure the final result is Mono<Void>
+                .then();
     }
 
     private List<Permission> mapNamesToPermissions(List<String> names, List<Scope> allApiScopes, String apiIdentifier) {
@@ -220,9 +217,7 @@ public class Auth0RoleService implements RoleService {
                 .map(scope -> {
                     Permission p = new Permission();
                     p.setName(scope.getValue());
-                    p.setResourceServerId(apiIdentifier); // Use the correct API identifier
-                    // p.setResourceServerName(...); // Generally not needed if identifier is set
-                    // p.setDescription(...); // Description is not part of the identifier
+                    p.setResourceServerId(apiIdentifier);
                     return p;
                 })
                 .collect(Collectors.toList());
@@ -246,19 +241,15 @@ public class Auth0RoleService implements RoleService {
     }
 
     private Mono<Void> addPermissionsToRoleApiCall(String roleId, List<Permission> permissionsToAdd) {
-         // Check for permissions that were requested but not found in API scopes
-        // This check should ideally happen earlier, maybe in mapNamesToPermissions or before calling it
         List<String> requestedNames = permissionsToAdd.stream().map(Permission::getName).collect(Collectors.toList());
-        List<String> addedNames = permissionsToAdd.stream().map(Permission::getName).collect(Collectors.toList()); // Assuming mapNamesToPermissions filters correctly
-        if (permissionsToAdd.size() != requestedNames.size()) { // Simplified check, refine if mapNamesToPermissions doesn't filter
+        List<String> addedNames = permissionsToAdd.stream().map(Permission::getName).collect(Collectors.toList());
+        if (permissionsToAdd.size() != requestedNames.size()) {
              log.warn("Role {}: Some requested permission names for addition were not found or mapped in the API scopes: Requested={}, Mapped={}",
                      roleId, requestedNames, addedNames);
-             // Decide if this is an error or just a warning. Throwing exception might be safer.
-             // For now, we proceed with adding the ones we could map.
-         }
+        }
 
         if (permissionsToAdd.isEmpty()) {
-            return Mono.empty(); // Nothing to add
+            return Mono.empty();
         }
 
         return Mono.fromRunnable(() -> {
