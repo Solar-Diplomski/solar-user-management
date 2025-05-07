@@ -8,6 +8,7 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 public class UpdatePermissionsRequest {
+    
     private List<PermissionUpdate> permissions;
 
     @Data

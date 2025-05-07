@@ -1,0 +1,1 @@
+package fer.solar.usermanagement.role;
