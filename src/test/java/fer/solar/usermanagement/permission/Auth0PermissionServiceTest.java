@@ -14,6 +14,7 @@ import com.auth0.json.mgmt.resourceserver.Scope;
 import com.auth0.net.Request;
 import com.auth0.net.Response;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Answers;
@@ -59,22 +60,25 @@ public class Auth0PermissionServiceTest {
     @InjectMocks
     private Auth0PermissionService auth0PermissionService;
 
-    @Test
-    void listPermissions_should_returnSortedPaginatedPermissionResponse_when_allApiCallsSucceed() throws Exception {
+    @BeforeEach
+    void setUp() {
         when(auth0Config.getRefreshedManagementAPI()).thenReturn(mockManagementAPI);
         when(auth0Config.getApiGatewayIdentifier()).thenReturn(API_IDENTIFIER);
+    }
 
+    @Test
+    void listPermissions_should_returnSortedPaginatedPermissionResponse_when_allApiCallsSucceed() throws Exception {
         Scope scopeWrite = new Scope("write:data");
         scopeWrite.setDescription("Write data permission");
         Scope scopeRead = new Scope("read:data");
         scopeRead.setDescription("Read data permission");
         
-        List<Scope> unsortedScopes = Arrays.asList(scopeWrite, scopeRead); 
+        List<Scope> scopesList = Arrays.asList(scopeWrite, scopeRead); 
 
-        ResourceServer resourceServer = new ResourceServer();
-        resourceServer.setScopes(unsortedScopes);
+        ResourceServer mockResourceServerWithScopes = new ResourceServer();
+        mockResourceServerWithScopes.setScopes(scopesList);
 
-        when(mockManagementAPI.resourceServers().get(API_IDENTIFIER).execute().getBody()).thenReturn(resourceServer);
+        when(mockManagementAPI.resourceServers().get(API_IDENTIFIER).execute().getBody()).thenReturn(mockResourceServerWithScopes);
 
         Mono<PaginatedPermissionResponse> result = auth0PermissionService.listPermissions();
 
@@ -102,10 +106,7 @@ public class Auth0PermissionServiceTest {
 
     @Test
     void listPermissions_should_returnEmptyPaginatedPermissionResponse_when_apiThrowsException() throws Exception {
-        when(auth0Config.getRefreshedManagementAPI()).thenReturn(mockManagementAPI);
-        when(auth0Config.getApiGatewayIdentifier()).thenReturn(API_IDENTIFIER);
-
-        com.auth0.exception.Auth0Exception auth0Exception = new com.auth0.exception.Auth0Exception("API call failed");
+        Auth0Exception auth0Exception = new Auth0Exception("API call failed");
         when(mockManagementAPI.resourceServers().get(API_IDENTIFIER).execute()).thenThrow(auth0Exception);
 
         Mono<PaginatedPermissionResponse> result = auth0PermissionService.listPermissions();
@@ -125,9 +126,6 @@ public class Auth0PermissionServiceTest {
 
     @Test
     void listPermissions_should_returnEmptyPaginatedPermissionResponse_when_noPermissionsFound() throws Exception {
-        when(auth0Config.getRefreshedManagementAPI()).thenReturn(mockManagementAPI);
-        when(auth0Config.getApiGatewayIdentifier()).thenReturn(API_IDENTIFIER);
-
         ResourceServer resourceServerWithNoScopes = new ResourceServer();
         resourceServerWithNoScopes.setScopes(java.util.Collections.emptyList());
 
@@ -150,24 +148,21 @@ public class Auth0PermissionServiceTest {
 
     @Test
     void updatePermissions_should_updateResourceServer_when_requestIsValid() throws Exception {
-        when(auth0Config.getRefreshedManagementAPI()).thenReturn(mockManagementAPI);
-        when(auth0Config.getApiGatewayIdentifier()).thenReturn(API_IDENTIFIER);
-        when(mockManagementAPI.resourceServers()).thenReturn(mockResourceServerEntity);
-        when(mockResourceServerEntity.update(eq(API_IDENTIFIER), any(ResourceServer.class))).thenReturn(mockResourceServerRequest);
+        setupCommonUpdateMocks();
         when(mockResourceServerRequest.execute()).thenReturn(mockResourceServerResponse);
 
-        PermissionUpdate permDto1 = new PermissionUpdate();
-        permDto1.setPermissionName("edit:config");
-        permDto1.setDescription("Edit configuration");
+        PermissionUpdate permissionUpdate1 = new PermissionUpdate();
+        permissionUpdate1.setPermissionName("edit:config");
+        permissionUpdate1.setDescription("Edit configuration");
 
-        PermissionUpdate permDto2 = new PermissionUpdate();
-        permDto2.setPermissionName("view:logs");
-        permDto2.setDescription("View system logs");
+        PermissionUpdate permissionUpdate2 = new PermissionUpdate();
+        permissionUpdate2.setPermissionName("view:logs");
+        permissionUpdate2.setDescription("View system logs");
 
-        List<PermissionUpdate> requestedPermissionUpdates = Arrays.asList(permDto1, permDto2);
+        List<PermissionUpdate> permissionUpdatesList = Arrays.asList(permissionUpdate1, permissionUpdate2);
 
         UpdatePermissionsRequest updateRequest = new UpdatePermissionsRequest();
-        updateRequest.setPermissions(requestedPermissionUpdates);
+        updateRequest.setPermissions(permissionUpdatesList);
 
         ArgumentCaptor<ResourceServer> resourceServerCaptor = ArgumentCaptor.forClass(ResourceServer.class);
 
@@ -185,17 +180,14 @@ public class Auth0PermissionServiceTest {
         assertThat(capturedResourceServer.getScopes())
             .extracting(Scope::getValue, Scope::getDescription)
             .containsExactlyInAnyOrder(
-                tuple(permDto1.getPermissionName(), permDto1.getDescription()),
-                tuple(permDto2.getPermissionName(), permDto2.getDescription())
+                tuple(permissionUpdate1.getPermissionName(), permissionUpdate1.getDescription()),
+                tuple(permissionUpdate2.getPermissionName(), permissionUpdate2.getDescription())
             );
     }
 
     @Test
     void updatePermissions_should_throwRuntimeException_when_apiThrowsException() throws Exception {
-        when(auth0Config.getRefreshedManagementAPI()).thenReturn(mockManagementAPI);
-        when(auth0Config.getApiGatewayIdentifier()).thenReturn(API_IDENTIFIER);
-        when(mockManagementAPI.resourceServers()).thenReturn(mockResourceServerEntity);
-        when(mockResourceServerEntity.update(eq(API_IDENTIFIER), any(ResourceServer.class))).thenReturn(mockResourceServerRequest);
+        setupCommonUpdateMocks();
 
         Auth0Exception auth0Exception = new Auth0Exception("API call failed during update");
         when(mockResourceServerRequest.execute()).thenThrow(auth0Exception);
@@ -208,6 +200,11 @@ public class Auth0PermissionServiceTest {
         StepVerifier.create(result)
             .expectError(RuntimeException.class)
             .verify();
+    }
+
+    private void setupCommonUpdateMocks() {
+        when(mockManagementAPI.resourceServers()).thenReturn(mockResourceServerEntity);
+        when(mockResourceServerEntity.update(eq(API_IDENTIFIER), any(ResourceServer.class))).thenReturn(mockResourceServerRequest);
     }
     
 }

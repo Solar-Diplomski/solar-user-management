@@ -296,4 +296,5 @@ public class Auth0RoleService implements RoleService {
                 .subscribeOn(Schedulers.boundedElastic())
                 .then();
     }
+    
 } 
