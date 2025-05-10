@@ -13,5 +13,5 @@ public class UserResponse {
     private String name;
     private String picture;
     private String lastLogin;
-    private List<String> roles; // List of role names or IDs
+    private List<RoleInfo> roles; // Changed type to List<RoleInfo>
 } 

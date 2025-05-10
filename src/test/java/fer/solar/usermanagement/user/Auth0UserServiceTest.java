@@ -15,8 +15,10 @@ import com.auth0.net.Request;
 import com.auth0.net.Response;
 import fer.solar.usermanagement.config.Auth0Config;
 import fer.solar.usermanagement.user.dto.CreateUserRequest;
+import fer.solar.usermanagement.user.dto.CreateUserResponse;
 import fer.solar.usermanagement.user.dto.PaginatedUserResponse;
 import fer.solar.usermanagement.user.dto.UserResponse;
+import fer.solar.usermanagement.user.dto.RoleInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -132,10 +134,10 @@ class Auth0UserServiceTest {
         mockRoleAssignmentSuccess();
         mockTicketGenerationSuccess();
 
-        Mono<String> resultMono = auth0UserService.createUser(defaultCreateRequest);
+        Mono<CreateUserResponse> resultMono = auth0UserService.createUser(defaultCreateRequest);
 
         StepVerifier.create(resultMono)
-                .expectNext(expectedTicketUrl)
+                .expectNextMatches(response -> response.getTicketUrl().equals(expectedTicketUrl))
                 .verifyComplete();
 
         User capturedUser = userCaptor.getValue();
@@ -164,10 +166,10 @@ class Auth0UserServiceTest {
         mockUserCreationSuccess();
         mockTicketGenerationSuccess();
 
-        Mono<String> resultMono = auth0UserService.createUser(requestWithNoRoles);
+        Mono<CreateUserResponse> resultMono = auth0UserService.createUser(requestWithNoRoles);
 
         StepVerifier.create(resultMono)
-                .expectNext(expectedTicketUrl)
+                .expectNextMatches(response -> response.getTicketUrl().equals(expectedTicketUrl))
                 .verifyComplete();
 
         verify(users).create(any(User.class));
@@ -184,7 +186,7 @@ class Auth0UserServiceTest {
         mockRoleAssignmentFailure(roleException);
         mockUserDeletionSuccess();
 
-        Mono<String> resultMono = auth0UserService.createUser(defaultCreateRequest);
+        Mono<CreateUserResponse> resultMono = auth0UserService.createUser(defaultCreateRequest);
 
         StepVerifier.create(resultMono)
                 .expectErrorSatisfies(throwable -> {
@@ -206,7 +208,7 @@ class Auth0UserServiceTest {
         mockTicketGenerationFailure(ticketException);
         mockUserDeletionSuccess();
 
-        Mono<String> resultMono = auth0UserService.createUser(defaultCreateRequest);
+        Mono<CreateUserResponse> resultMono = auth0UserService.createUser(defaultCreateRequest);
 
         StepVerifier.create(resultMono)
                 .expectErrorSatisfies(throwable -> {
@@ -225,7 +227,7 @@ class Auth0UserServiceTest {
         APIException createException = createApiException("User creation failed", 400);
         mockUserCreationFailure(createException);
 
-        Mono<String> resultMono = auth0UserService.createUser(defaultCreateRequest);
+        Mono<CreateUserResponse> resultMono = auth0UserService.createUser(defaultCreateRequest);
 
         StepVerifier.create(resultMono)
                 .expectErrorSatisfies(throwable -> {
@@ -249,7 +251,7 @@ class Auth0UserServiceTest {
         mockRoleAssignmentFailure(roleException);
         mockUserDeletionFailure(deleteException);
 
-        Mono<String> resultMono = auth0UserService.createUser(defaultCreateRequest);
+        Mono<CreateUserResponse> resultMono = auth0UserService.createUser(defaultCreateRequest);
 
         StepVerifier.create(resultMono)
                 .expectErrorSatisfies(throwable -> {
@@ -287,11 +289,11 @@ class Auth0UserServiceTest {
 
                 assertThat(response.getContent()).anySatisfy(resUser -> {
                     assertThat(resUser.getUserId()).isEqualTo(user1.getId());
-                    assertThat(resUser.getRoles()).containsExactly("Role1");
+                    assertThat(resUser.getRoles()).extracting(RoleInfo::getName).containsExactly("Role1");
                 });
                 assertThat(response.getContent()).anySatisfy(resUser -> {
                     assertThat(resUser.getUserId()).isEqualTo(user2.getId());
-                    assertThat(resUser.getRoles()).containsExactlyInAnyOrder("Role1", "Role2");
+                    assertThat(resUser.getRoles()).extracting(RoleInfo::getName).containsExactlyInAnyOrder("Role1", "Role2");
                 });
             })
             .verifyComplete();
@@ -374,7 +376,7 @@ class Auth0UserServiceTest {
 
                 UserResponse resUser1 = response.getContent().get(0);
                 assertThat(resUser1.getUserId()).isEqualTo(user1.getId());
-                assertThat(resUser1.getRoles()).containsExactly("Role1");
+                assertThat(resUser1.getRoles()).extracting(RoleInfo::getName).containsExactly("Role1");
 
                 UserResponse resUser2 = response.getContent().get(1);
                 assertThat(resUser2.getUserId()).isEqualTo(user2.getId());
@@ -518,6 +520,7 @@ class Auth0UserServiceTest {
         if (roleNames != null) {
             for (String name : roleNames) {
                 Role mockRole = Mockito.mock(Role.class);
+                when(mockRole.getId()).thenReturn("role_" + name.toLowerCase());
                 when(mockRole.getName()).thenReturn(name);
                 mockRoles.add(mockRole);
             }
@@ -554,7 +557,7 @@ class Auth0UserServiceTest {
                 assertThat(userResponse.getUserId()).isEqualTo(targetUserId);
                 assertThat(userResponse.getEmail()).isEqualTo(user1.getEmail());
                 assertThat(userResponse.getName()).isEqualTo(user1.getName());
-                assertThat(userResponse.getRoles()).containsExactlyInAnyOrderElementsOf(expectedRoles);
+                assertThat(userResponse.getRoles()).extracting(RoleInfo::getName).containsExactlyInAnyOrderElementsOf(expectedRoles);
             })
             .verifyComplete();
 

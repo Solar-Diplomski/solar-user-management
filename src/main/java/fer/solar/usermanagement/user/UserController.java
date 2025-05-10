@@ -1,7 +1,9 @@
 package fer.solar.usermanagement.user;
 
 import fer.solar.usermanagement.user.dto.CreateUserRequest;
+import fer.solar.usermanagement.user.dto.CreateUserResponse;
 import fer.solar.usermanagement.user.dto.PaginatedUserResponse;
+import fer.solar.usermanagement.user.dto.UpdateUserRequest;
 import fer.solar.usermanagement.user.dto.UserResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -17,7 +19,7 @@ public class UserController {
     private final UserService userService;
 
     @PostMapping
-    public Mono<String> createUser(@RequestBody CreateUserRequest createUserRequest) {
+    public Mono<CreateUserResponse> createUser(@RequestBody CreateUserRequest createUserRequest) {
         return userService.createUser(createUserRequest);
     }
 
@@ -48,15 +50,10 @@ public class UserController {
         return userService.deleteUser(userId);
     }
 
-    // Note: Update endpoint implementation depends on the specific requirements
-    // Example placeholder:
-    /*
     @PutMapping("/{userId}")
-    public Mono<ResponseEntity<UserResponse>> updateUser(@PathVariable String userId, @RequestBody UpdateUserRequest updateUserRequest) {
-        // Assumes UpdateUserRequest exists in user.dto package
-        // return userService.updateUser(userId, updateUserRequest)
-        //         .map(ResponseEntity::ok)
-        //         .defaultIfEmpty(ResponseEntity.notFound().build());
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public Mono<Void> updateUser(@PathVariable String userId, @RequestBody UpdateUserRequest updateUserRequest) {
+        return userService.updateUser(userId, updateUserRequest);
     }
-    */
+
 } 
