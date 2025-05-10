@@ -147,9 +147,6 @@ public class Auth0RoleService implements RoleService {
                     if (request.getDescription() != null) {
                         roleUpdates.setDescription(request.getDescription());
                     }
-                    if (request.getName() == null && request.getDescription() == null) {
-                        return mgmt.roles().get(roleId).execute().getBody();
-                    }
                     Role updatedRole = mgmt.roles().update(roleId, roleUpdates).execute().getBody();
                     log.info("Updated Auth0 role base details: {}", roleId);
                     return updatedRole;
