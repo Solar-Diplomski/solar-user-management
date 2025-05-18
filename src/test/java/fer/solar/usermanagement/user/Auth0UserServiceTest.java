@@ -288,11 +288,11 @@ class Auth0UserServiceTest {
                 assertThat(response.getContent()).hasSize(2);
 
                 assertThat(response.getContent()).anySatisfy(resUser -> {
-                    assertThat(resUser.getUserId()).isEqualTo(user1.getId());
+                    assertThat(resUser.getId()).isEqualTo(user1.getId());
                     assertThat(resUser.getRoles()).extracting(RoleInfo::getName).containsExactly("Role1");
                 });
                 assertThat(response.getContent()).anySatisfy(resUser -> {
-                    assertThat(resUser.getUserId()).isEqualTo(user2.getId());
+                    assertThat(resUser.getId()).isEqualTo(user2.getId());
                     assertThat(resUser.getRoles()).extracting(RoleInfo::getName).containsExactlyInAnyOrder("Role1", "Role2");
                 });
             })
@@ -375,11 +375,11 @@ class Auth0UserServiceTest {
                 assertThat(response.getContent()).hasSize(2);
 
                 UserResponse resUser1 = response.getContent().get(0);
-                assertThat(resUser1.getUserId()).isEqualTo(user1.getId());
+                assertThat(resUser1.getId()).isEqualTo(user1.getId());
                 assertThat(resUser1.getRoles()).extracting(RoleInfo::getName).containsExactly("Role1");
 
                 UserResponse resUser2 = response.getContent().get(1);
-                assertThat(resUser2.getUserId()).isEqualTo(user2.getId());
+                assertThat(resUser2.getId()).isEqualTo(user2.getId());
                 assertThat(resUser2.getRoles()).isEmpty();
             })
             .verifyComplete();
@@ -554,7 +554,7 @@ class Auth0UserServiceTest {
 
         StepVerifier.create(resultMono)
             .assertNext(userResponse -> {
-                assertThat(userResponse.getUserId()).isEqualTo(targetUserId);
+                assertThat(userResponse.getId()).isEqualTo(targetUserId);
                 assertThat(userResponse.getEmail()).isEqualTo(user1.getEmail());
                 assertThat(userResponse.getName()).isEqualTo(user1.getName());
                 assertThat(userResponse.getRoles()).extracting(RoleInfo::getName).containsExactlyInAnyOrderElementsOf(expectedRoles);
@@ -578,7 +578,7 @@ class Auth0UserServiceTest {
 
         StepVerifier.create(resultMono)
             .assertNext(userResponse -> {
-                assertThat(userResponse.getUserId()).isEqualTo(targetUserId);
+                assertThat(userResponse.getId()).isEqualTo(targetUserId);
                 assertThat(userResponse.getEmail()).isEqualTo(user1.getEmail());
                 assertThat(userResponse.getName()).isEqualTo(user1.getName());
                 assertThat(userResponse.getRoles()).isEmpty();

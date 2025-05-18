@@ -8,10 +8,10 @@ import java.util.List;
 @Data
 @Builder
 public class UserResponse {
-    private String userId;
+    private String id;
     private String email;
     private String name;
     private String picture;
     private String lastLogin;
-    private List<RoleInfo> roles; // Changed type to List<RoleInfo>
+    private List<RoleInfo> roles;
 } 

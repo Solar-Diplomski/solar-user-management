@@ -204,7 +204,7 @@ public class Auth0UserService implements UserService {
                             .collect(Collectors.toList());
 
                     return UserResponse.builder()
-                            .userId(user.getId())
+                            .id(user.getId())
                             .email(user.getEmail())
                             .name(user.getName())
                             .picture(user.getPicture())
@@ -216,7 +216,7 @@ public class Auth0UserService implements UserService {
                 .onErrorResume(Auth0Exception.class, e -> {
                     log.error("Error fetching roles for user {}: {}", user.getId(), e.getMessage());
                     return Mono.just(UserResponse.builder()
-                            .userId(user.getId())
+                            .id(user.getId())
                             .email(user.getEmail())
                             .name(user.getName())
                             .picture(user.getPicture())
