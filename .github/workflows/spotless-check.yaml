@@ -10,7 +10,7 @@ on:
 jobs:
   spotless:
     name: Run mvn spotless:check
-    if: github.event.pull_request.head.ref == 'main'  # Source branch is 'main'
+    if: github.event.pull_request.head.ref == 'f-hruza0111'  # Source branch is 'main'
     runs-on: self-hosted  # Use your org-wide self-hosted runner
 
     steps:
