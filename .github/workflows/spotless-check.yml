@@ -1,0 +1,28 @@
+# .github/workflows/spotless-check.yml
+name: Spotless Check
+
+on:
+  pull_request:
+    branches: [prod]        # Target branch of the PR
+    paths:
+      - '**.java'           # Optional: Only run if Java files change
+
+jobs:
+  spotless:
+    name: Run mvn spotless:check
+    if: github.event.pull_request.head.ref == 'main'  or # Source branch is 'main'
+    runs-on: [self-hosted, Openshift]  # Use your org-wide self-hosted runner
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'  # Adjust if needed
+          cache: maven
+
+      - name: Run Spotless Check
+        run: mvn spotless:check
