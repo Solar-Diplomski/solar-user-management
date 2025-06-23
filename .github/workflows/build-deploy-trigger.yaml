@@ -1,0 +1,23 @@
+# .github/workflows/spotless-check.yml
+name: OKD Build and Deploy Trigger
+
+on:
+  push:
+    branches: [prod]     
+    
+jobs:
+  build-trigger:
+    name: Trigger OKD build
+    runs-on: [self-hosted, Openshift]  # Use your org-wide self-hosted runner
+
+    steps:  
+      - name: Login to cluster
+        run: |
+          oc login --token="${{ secrets.OKD_TOKEN }}" --server="${{ secrets.OKD_SERVER_URL }}" --insecure-skip-tls-verify
+      - name: Start build
+        run: |
+          oc start-build user-management-docker-build -n solar-build --wait --follow
+      - name: Trigger redeployment with new image
+        run: |
+          oc rollout restart deployment/solar-user-management -n solar
+      
